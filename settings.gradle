@@ -1,1 +1,1 @@
-include ':bluetooth-spp-terminal'
+include ':bike-air-sensor-logger'
