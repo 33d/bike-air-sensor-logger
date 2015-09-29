@@ -1,4 +1,4 @@
-package ru.sash0k.bluetooth_terminal.activity;
+package au.id.dsp.bikeairsensorlogger.activity;
 
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -10,7 +10,7 @@ import com.actionbarsherlock.app.ActionBar;
 import com.actionbarsherlock.app.SherlockPreferenceActivity;
 import com.actionbarsherlock.view.MenuItem;
 
-import ru.sash0k.bluetooth_terminal.R;
+import au.id.dsp.bikeairsensorlogger.R;
 
 /**
  * Created by sash0k on 29.11.13.

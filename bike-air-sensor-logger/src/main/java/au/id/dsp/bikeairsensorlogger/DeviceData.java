@@ -1,11 +1,11 @@
-package ru.sash0k.bluetooth_terminal;
+package au.id.dsp.bikeairsensorlogger;
 
 import java.util.ArrayList;
 
 import android.bluetooth.BluetoothDevice;
 import android.os.ParcelUuid;
 
-import ru.sash0k.bluetooth_terminal.bluetooth.BluetoothUtils;
+import au.id.dsp.bikeairsensorlogger.bluetooth.BluetoothUtils;
 
 
 public class DeviceData {

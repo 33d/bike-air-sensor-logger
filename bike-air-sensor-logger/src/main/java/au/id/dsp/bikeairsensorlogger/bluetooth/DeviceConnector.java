@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package ru.sash0k.bluetooth_terminal.bluetooth;
+package au.id.dsp.bikeairsensorlogger.bluetooth;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,8 +28,8 @@ import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
 
-import ru.sash0k.bluetooth_terminal.DeviceData;
-import ru.sash0k.bluetooth_terminal.activity.DeviceControlActivity;
+import au.id.dsp.bikeairsensorlogger.DeviceData;
+import au.id.dsp.bikeairsensorlogger.activity.DeviceControlActivity;
 
 
 public class DeviceConnector {

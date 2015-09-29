@@ -1,4 +1,4 @@
-package ru.sash0k.bluetooth_terminal.activity;
+package au.id.dsp.bikeairsensorlogger.activity;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
@@ -25,11 +25,11 @@ import java.lang.ref.WeakReference;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-import ru.sash0k.bluetooth_terminal.DeviceData;
-import ru.sash0k.bluetooth_terminal.R;
-import ru.sash0k.bluetooth_terminal.Utils;
-import ru.sash0k.bluetooth_terminal.bluetooth.DeviceConnector;
-import ru.sash0k.bluetooth_terminal.bluetooth.DeviceListActivity;
+import au.id.dsp.bikeairsensorlogger.DeviceData;
+import au.id.dsp.bikeairsensorlogger.R;
+import au.id.dsp.bikeairsensorlogger.Utils;
+import au.id.dsp.bikeairsensorlogger.bluetooth.DeviceConnector;
+import au.id.dsp.bikeairsensorlogger.bluetooth.DeviceListActivity;
 
 public final class DeviceControlActivity extends BaseActivity {
     private static final String DEVICE_NAME = "DEVICE_NAME";

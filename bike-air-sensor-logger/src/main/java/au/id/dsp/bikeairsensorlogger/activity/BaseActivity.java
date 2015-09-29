@@ -1,4 +1,4 @@
-package ru.sash0k.bluetooth_terminal.activity;
+package au.id.dsp.bikeairsensorlogger.activity;
 
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
@@ -7,8 +7,8 @@ import android.os.Bundle;
 
 import com.actionbarsherlock.app.SherlockActivity;
 
-import ru.sash0k.bluetooth_terminal.R;
-import ru.sash0k.bluetooth_terminal.Utils;
+import au.id.dsp.bikeairsensorlogger.R;
+import au.id.dsp.bikeairsensorlogger.Utils;
 
 /**
  * Общий базовый класс. Инициализация BT-адаптера

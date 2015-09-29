@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package ru.sash0k.bluetooth_terminal.bluetooth;
+package au.id.dsp.bikeairsensorlogger.bluetooth;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
@@ -37,7 +37,7 @@ import android.widget.TextView;
 import java.util.HashSet;
 import java.util.Set;
 
-import ru.sash0k.bluetooth_terminal.R;
+import au.id.dsp.bikeairsensorlogger.R;
 
 
 /**

@@ -1,4 +1,4 @@
-package ru.sash0k.bluetooth_terminal;
+package au.id.dsp.bikeairsensorlogger;
 
 import android.content.Context;
 import android.content.SharedPreferences;

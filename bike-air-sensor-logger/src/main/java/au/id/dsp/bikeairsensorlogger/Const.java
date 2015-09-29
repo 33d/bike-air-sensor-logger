@@ -1,4 +1,4 @@
-package ru.sash0k.bluetooth_terminal;
+package au.id.dsp.bikeairsensorlogger;
 
 /**
  * Created by sash0k on 12.12.13.
