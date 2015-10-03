@@ -20,6 +20,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.UUID;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.TimeZone;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -52,6 +56,12 @@ public class DeviceConnector {
     private ConnectedThread mConnectedThread;
     private final Handler mHandler;
     private final String deviceName;
+
+    private static final DateFormat timestampFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
+    static {
+        timestampFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+    }
+
     // ==========================================================================
 
 
@@ -333,13 +343,14 @@ public class DeviceConnector {
                 try {
                     // считываю входящие данные из потока и собираю в строку ответа
                     bytes = mmInStream.read(buffer);
-                    String readed = new String(buffer, 0, bytes);
-                    readMessage.append(readed);
+                    readMessage.append(new String(buffer, 0, bytes, "US-ASCII"));
 
                     // маркер конца команды - вернуть ответ в главный поток
-                    if (readed.contains("\n")) {
-                        mHandler.obtainMessage(DeviceControlActivity.MESSAGE_READ, bytes, -1, readMessage.toString()).sendToTarget();
-                        readMessage.setLength(0);
+                    int end;
+                    while ((end = readMessage.indexOf("\n")) != -1) {
+                        String message = timestampFormat.format(new Date()) + ' ' + readMessage.substring(0, end);
+                        mHandler.obtainMessage(DeviceControlActivity.MESSAGE_READ, bytes, -1, message).sendToTarget();
+                        readMessage.delete(0, end + 1).setLength(0);
                     }
 
                 } catch (IOException e) {
