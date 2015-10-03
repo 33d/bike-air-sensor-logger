@@ -19,6 +19,7 @@ package au.id.dsp.bikeairsensorlogger.bluetooth;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.UUID;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -40,6 +41,8 @@ public class DeviceConnector {
     public static final int STATE_NONE = 0;       // we're doing nothing
     public static final int STATE_CONNECTING = 1; // now initiating an outgoing connection
     public static final int STATE_CONNECTED = 2;  // now connected to a remote device
+
+    private static final UUID sppUUID = new UUID(0x0000110100001000l, 0x800000805F9B34FBl);
 
     private int mState;
 
@@ -65,7 +68,7 @@ public class DeviceConnector {
     /**
      * Запрос на соединение с устойством
      */
-    public synchronized void connect() {
+    public synchronized void connect() throws IOException {
         if (D) Log.d(TAG, "connect to: " + connectedDevice);
 
         if (mState == STATE_CONNECTING) {
@@ -83,9 +86,14 @@ public class DeviceConnector {
         }
 
         // Start the thread to connect with the given device
-        mConnectThread = new ConnectThread(connectedDevice);
-        mConnectThread.start();
-        setState(STATE_CONNECTING);
+        try {
+            mConnectThread = new ConnectThread(connectedDevice);
+            mConnectThread.start();
+            setState(STATE_CONNECTING);
+        } catch (IOException e) {
+            setState(STATE_NONE);
+            throw e;
+        }
     }
     // ==========================================================================
 
@@ -213,10 +221,11 @@ public class DeviceConnector {
         private final BluetoothSocket mmSocket;
         private final BluetoothDevice mmDevice;
 
-        public ConnectThread(BluetoothDevice device) {
+        public ConnectThread(BluetoothDevice device) throws IOException {
             if (D) Log.d(TAG, "create ConnectThread");
             mmDevice = device;
-            mmSocket = BluetoothUtils.createRfcommSocket(mmDevice);
+
+            mmSocket = mmDevice.createInsecureRfcommSocketToServiceRecord(sppUUID);
         }
         // ==========================================================================
 

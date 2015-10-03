@@ -21,6 +21,7 @@ import com.actionbarsherlock.app.ActionBar;
 import com.actionbarsherlock.view.Menu;
 import com.actionbarsherlock.view.MenuItem;
 
+import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -260,7 +261,11 @@ public final class DeviceControlActivity extends BaseActivity {
                 if (resultCode == Activity.RESULT_OK) {
                     String address = data.getStringExtra(DeviceListActivity.EXTRA_DEVICE_ADDRESS);
                     BluetoothDevice device = btAdapter.getRemoteDevice(address);
-                    if (super.isAdapterReady() && (connector == null)) setupConnector(device);
+                    try {
+                        if (super.isAdapterReady() && (connector == null)) setupConnector(device);
+                    } catch (IOException e) {
+                        Utils.log(e.getMessage());
+                    }
                 }
                 break;
             case REQUEST_ENABLE_BT:
@@ -278,7 +283,7 @@ public final class DeviceControlActivity extends BaseActivity {
     /**
      * Установка соединения с устройством
      */
-    private void setupConnector(BluetoothDevice connectedDevice) {
+    private void setupConnector(BluetoothDevice connectedDevice) throws IOException {
         stopConnection();
         try {
             String emptyName = getString(R.string.empty_device_name);
