@@ -288,7 +288,7 @@ public final class DeviceControlActivity extends BaseActivity {
         try {
             String emptyName = getString(R.string.empty_device_name);
             DeviceData data = new DeviceData(connectedDevice, emptyName);
-            connector = new DeviceConnector(data, mHandler);
+            connector = new DeviceConnector(data, mHandler, this);
             connector.connect();
         } catch (IllegalArgumentException e) {
             Utils.log("setupConnector failed: " + e.getMessage());

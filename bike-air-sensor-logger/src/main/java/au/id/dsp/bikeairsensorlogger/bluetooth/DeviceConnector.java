@@ -16,22 +16,30 @@
 
 package au.id.dsp.bikeairsensorlogger.bluetooth;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.UUID;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.TimeZone;
-
+import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.content.Context;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Formatter;
+import java.util.TimeZone;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import au.id.dsp.bikeairsensorlogger.DeviceData;
 import au.id.dsp.bikeairsensorlogger.activity.DeviceControlActivity;
@@ -56,21 +64,52 @@ public class DeviceConnector {
     private ConnectedThread mConnectedThread;
     private final Handler mHandler;
     private final String deviceName;
+    private final LocationManager locationManager;
+    private Location lastLocation;
+    private Object lastLocationLock = new Object();
 
     private static final DateFormat timestampFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
     static {
         timestampFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
     }
 
+    private static final String locationFormat = "<%.5f,%.5f,%.1f>";
+    private static final String unknownLocation = "<?,?,?>";
+
+    private final LocationListener locationListener = new LocationListener() {
+        @Override
+        public void onLocationChanged(Location location) {
+            synchronized (lastLocationLock) {
+                lastLocation = location;
+            }
+        }
+
+        @Override
+        public void onStatusChanged(String s, int i, Bundle bundle) {
+
+        }
+
+        @Override
+        public void onProviderEnabled(String s) {
+
+        }
+
+        @Override
+        public void onProviderDisabled(String s) {
+
+        }
+    };
+
     // ==========================================================================
 
 
-    public DeviceConnector(DeviceData deviceData, Handler handler) {
+    public DeviceConnector(DeviceData deviceData, Handler handler, Context context) {
         mHandler = handler;
         btAdapter = BluetoothAdapter.getDefaultAdapter();
         connectedDevice = btAdapter.getRemoteDevice(deviceData.getAddress());
         deviceName = (deviceData.getName() == null) ? deviceData.getAddress() : deviceData.getName();
         mState = STATE_NONE;
+        locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
     }
     // ==========================================================================
 
@@ -177,6 +216,15 @@ public class DeviceConnector {
         // Start the thread to manage the connection and perform transmissions
         mConnectedThread = new ConnectedThread(socket);
         mConnectedThread.start();
+
+        // LocationManager wants to post events to some message queue. The callbacks should be
+        // fast so  this should do
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
+            }
+        });
     }
     // ==========================================================================
 
@@ -216,6 +264,10 @@ public class DeviceConnector {
         msg.setData(bundle);
         mHandler.sendMessage(msg);
         setState(STATE_NONE);
+        locationManager.removeUpdates(locationListener);
+        synchronized (lastLocationLock) {
+            lastLocation = null;
+        }
     }
     // ==========================================================================
 
@@ -331,6 +383,17 @@ public class DeviceConnector {
         }
         // ==========================================================================
 
+        private String formatLocation() {
+            Location location;
+            synchronized (lastLocationLock) {
+                location = lastLocation == null ? null : new Location(lastLocation);
+            }
+            if (location != null && System.currentTimeMillis() - location.getTime() < 10000)
+                return String.format(locationFormat, location.getLatitude(), location.getLongitude(), location.getAccuracy());
+            else
+                return unknownLocation;
+        }
+
         /**
          * Основной рабочий метод - ждёт входящих команд от потока
          */
@@ -348,7 +411,7 @@ public class DeviceConnector {
                     // маркер конца команды - вернуть ответ в главный поток
                     int end;
                     while ((end = readMessage.indexOf("\n")) != -1) {
-                        String message = timestampFormat.format(new Date()) + ' ' + readMessage.substring(0, end);
+                        String message = timestampFormat.format(new Date()) + ' ' + formatLocation() + ' ' + readMessage.substring(0, end);
                         mHandler.obtainMessage(DeviceControlActivity.MESSAGE_READ, bytes, -1, message).sendToTarget();
                         readMessage.delete(0, end + 1).setLength(0);
                     }
