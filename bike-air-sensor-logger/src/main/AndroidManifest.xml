@@ -30,6 +30,8 @@
             android:label="@string/select_device"
             android:theme="@style/DialogTheme" />
 
+        <service android:name="au.id.dsp.bikeairsensorlogger.bluetooth.BluetoothLoggerService" />
+
     </application>
 
 </manifest>

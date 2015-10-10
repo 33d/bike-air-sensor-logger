@@ -2,11 +2,14 @@ package au.id.dsp.bikeairsensorlogger.activity;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
+import android.content.ComponentName;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Message;
+import android.os.Messenger;
 import android.preference.PreferenceManager;
 import android.text.InputFilter;
 import android.text.InputType;
@@ -21,15 +24,14 @@ import com.actionbarsherlock.app.ActionBar;
 import com.actionbarsherlock.view.Menu;
 import com.actionbarsherlock.view.MenuItem;
 
-import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-import au.id.dsp.bikeairsensorlogger.DeviceData;
 import au.id.dsp.bikeairsensorlogger.R;
 import au.id.dsp.bikeairsensorlogger.Utils;
-import au.id.dsp.bikeairsensorlogger.bluetooth.DeviceConnector;
+import au.id.dsp.bikeairsensorlogger.bluetooth.BluetoothLoggerService;
+import au.id.dsp.bikeairsensorlogger.bluetooth.DeviceConnection;
 import au.id.dsp.bikeairsensorlogger.bluetooth.DeviceListActivity;
 
 public final class DeviceControlActivity extends BaseActivity {
@@ -42,7 +44,6 @@ public final class DeviceControlActivity extends BaseActivity {
     private static String MSG_CONNECTING;
     private static String MSG_CONNECTED;
 
-    private static DeviceConnector connector;
     private static BluetoothResponseHandler mHandler;
 
     private TextView logTextView;
@@ -52,7 +53,10 @@ public final class DeviceControlActivity extends BaseActivity {
     private boolean hexMode, needClean;
     private boolean show_timings, show_direction;
     private String command_ending;
-    private String deviceName;
+    private String deviceAddress;
+    private boolean connected = false;
+
+    private BluetoothLoggerService.Binder service;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -103,13 +107,29 @@ public final class DeviceControlActivity extends BaseActivity {
                 return false;
             }
         });
+
+        Intent service = new Intent(this, BluetoothLoggerService.class)
+                .putExtra(BluetoothLoggerService.EXTRA_MESSENGER, new Messenger(new BluetoothResponseHandler(this)));
+        startService(service);
+        bindService(service, new ServiceConnection() {
+            @Override
+            public void onServiceConnected(ComponentName componentName, IBinder binder) {
+                DeviceControlActivity.this.service = (BluetoothLoggerService.Binder) binder;
+                DeviceControlActivity.this.service.register(mHandler);
+            }
+
+            @Override
+            public void onServiceDisconnected(ComponentName componentName) {
+                DeviceControlActivity.this.service = null;
+            }
+        }, 0);
     }
     // ==========================================================================
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-        outState.putString(DEVICE_NAME, deviceName);
+        outState.putString(DEVICE_NAME, deviceAddress);
         if (logTextView != null) {
             final String log = logTextView.getText().toString();
             outState.putString(LOG, log);
@@ -122,7 +142,7 @@ public final class DeviceControlActivity extends BaseActivity {
      * Проверка готовности соединения
      */
     private boolean isConnected() {
-        return (connector != null) && (connector.getState() == DeviceConnector.STATE_CONNECTED);
+        return connected;
     }
     // ==========================================================================
 
@@ -131,10 +151,9 @@ public final class DeviceControlActivity extends BaseActivity {
      * Разорвать соединение
      */
     private void stopConnection() {
-        if (connector != null) {
-            connector.stop();
-            connector = null;
-            deviceName = null;
+        if (connected) {
+            service.disconnect(deviceAddress);
+            deviceAddress = null;
         }
     }
     // ==========================================================================
@@ -260,12 +279,7 @@ public final class DeviceControlActivity extends BaseActivity {
                 // When DeviceListActivity returns with a device to connect
                 if (resultCode == Activity.RESULT_OK) {
                     String address = data.getStringExtra(DeviceListActivity.EXTRA_DEVICE_ADDRESS);
-                    BluetoothDevice device = btAdapter.getRemoteDevice(address);
-                    try {
-                        if (super.isAdapterReady() && (connector == null)) setupConnector(device);
-                    } catch (IOException e) {
-                        Utils.log(e.getMessage());
-                    }
+                    if (super.isAdapterReady()) connect(address);
                 }
                 break;
             case REQUEST_ENABLE_BT:
@@ -283,15 +297,13 @@ public final class DeviceControlActivity extends BaseActivity {
     /**
      * Установка соединения с устройством
      */
-    private void setupConnector(BluetoothDevice connectedDevice) throws IOException {
+    private void connect(String address) {
         stopConnection();
         try {
-            String emptyName = getString(R.string.empty_device_name);
-            DeviceData data = new DeviceData(connectedDevice, emptyName);
-            connector = new DeviceConnector(data, mHandler, this);
-            connector.connect();
+            this.deviceAddress = address;
+            service.connect(this, address);
         } catch (IllegalArgumentException e) {
-            Utils.log("setupConnector failed: " + e.getMessage());
+            Utils.log("connect failed: " + e.getMessage());
         }
     }
     // ==========================================================================
@@ -313,7 +325,7 @@ public final class DeviceControlActivity extends BaseActivity {
             byte[] command = (hexMode ? Utils.toHex(commandString) : commandString.getBytes());
             if (command_ending != null) command = Utils.concat(command, command_ending.getBytes());
             if (isConnected()) {
-                connector.write(command);
+                //connector.write(command); // TODO: Remove write support
                 appendLog(commandString, hexMode, true, needClean);
             }
         }
@@ -351,7 +363,6 @@ public final class DeviceControlActivity extends BaseActivity {
 
 
     void setDeviceName(String deviceName) {
-        this.deviceName = deviceName;
         getSupportActionBar().setSubtitle(deviceName);
     }
     // ==========================================================================
@@ -376,41 +387,45 @@ public final class DeviceControlActivity extends BaseActivity {
             DeviceControlActivity activity = mActivity.get();
             if (activity != null) {
                 switch (msg.what) {
-                    case MESSAGE_STATE_CHANGE:
+                    case BluetoothLoggerService.MESSAGE_UPDATE:
 
                         Utils.log("MESSAGE_STATE_CHANGE: " + msg.arg1);
                         final ActionBar bar = activity.getSupportActionBar();
-                        switch (msg.arg1) {
-                            case DeviceConnector.STATE_CONNECTED:
+                        switch (DeviceConnection.State.values()[msg.arg2]) {
+                            case CONNECTED:
                                 bar.setSubtitle(MSG_CONNECTED);
                                 break;
-                            case DeviceConnector.STATE_CONNECTING:
+                            case CONNECTING:
                                 bar.setSubtitle(MSG_CONNECTING);
                                 break;
-                            case DeviceConnector.STATE_NONE:
+                            case CLOSING:
+                                bar.setSubtitle("Closing");
+                                break;
+                            case CLOSED:
+                                bar.setSubtitle("Closed");
+                                break;
+                            case IDLE:
                                 bar.setSubtitle(MSG_NOT_CONNECTED);
                                 break;
+                            case ERROR:
+                                bar.setSubtitle(((Throwable) msg.obj).getLocalizedMessage());
+                                break;
+                        }
+
+                        if (msg.arg2 != DeviceConnection.State.ERROR.ordinal()) {
+                            BluetoothLoggerService.DeviceDescriptor descriptor = (BluetoothLoggerService.DeviceDescriptor) msg.obj;
+                            if (descriptor != null)
+                                activity.setDeviceName(descriptor.name == null ? descriptor.address : descriptor.name);
                         }
                         break;
 
-                    case MESSAGE_READ:
+                    case BluetoothLoggerService.MESSAGE_READ:
                         final String readMessage = (String) msg.obj;
                         if (readMessage != null) {
                             activity.appendLog(readMessage, false, false, activity.needClean);
                         }
                         break;
 
-                    case MESSAGE_DEVICE_NAME:
-                        activity.setDeviceName((String) msg.obj);
-                        break;
-
-                    case MESSAGE_WRITE:
-                        // stub
-                        break;
-
-                    case MESSAGE_TOAST:
-                        // stub
-                        break;
                 }
             }
         }
