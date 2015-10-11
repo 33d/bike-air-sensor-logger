@@ -4,11 +4,17 @@ import android.app.Notification;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
+import android.util.Log;
 
+import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,6 +23,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import au.id.dsp.bikeairsensorlogger.R;
 
@@ -24,6 +31,7 @@ import au.id.dsp.bikeairsensorlogger.R;
  * Created by damien on 5/10/15.
  */
 public class BluetoothLoggerService extends Service {
+    private static final String TAG = "BluetoothLoggerService";
 
     public static final int MESSAGE_UPDATE = 1;
     public static final int MESSAGE_READ = 2;
@@ -70,6 +78,7 @@ public class BluetoothLoggerService extends Service {
         }
     };
     private final Binder clientBinder = new Binder();
+    private LogDatabase db;
 
     public static class DeviceDescriptor {
         public final String address;
@@ -82,6 +91,7 @@ public class BluetoothLoggerService extends Service {
     }
 
     private final class DeviceHandler extends Handler {
+        private LogDatabase.WritableCapture capture;
         private final int id;
         private final DeviceDescriptor descriptor;
         private final DeviceConnection connection;
@@ -90,16 +100,22 @@ public class BluetoothLoggerService extends Service {
         public DeviceHandler(String address) {
             this.id = nextHandlerId++;
             connection = new DeviceConnection(address, this);
-            this.descriptor = new DeviceDescriptor(address, connection.getDeviceName());
+            this.descriptor = new DeviceDescriptor(connection.getDeviceAddress(), connection.getDeviceName());
         }
 
         public DeviceHandler connect() {
             connection.start();
+            capture = db.createCapture(descriptor.address, descriptor.name);
             return this;
         }
 
         public void disconnect() {
             connection.cancel();
+            try {
+                capture.close();
+            } catch (IOException e) {
+                Log.w(TAG, "Can't close database capture", e);
+            }
         }
 
         private void sendToClients(int what, int arg2, Object o) {
@@ -138,6 +154,7 @@ public class BluetoothLoggerService extends Service {
                 case DeviceConnection.MESSAGE_READ:
                     ++messageCount;
                     sendToClients(MESSAGE_READ, messageCount, (String) msg.obj);
+                    capture.write(Double.NaN, Double.NaN, Double.NaN, System.currentTimeMillis(), (String) msg.obj);
                     break;
             }
         }
@@ -167,12 +184,19 @@ public class BluetoothLoggerService extends Service {
 
     private synchronized void handlerFinished(DeviceHandler handler) {
         handlers.remove(handler.descriptor.address);
-        if (handlers.isEmpty())
+        if (handlers.isEmpty()) {
             stopForeground(true);
+            try {
+                db.close();
+            } catch (IOException e) {
+                Log.w("BluetoothLoggerService", "Database didn't close", e);
+            }
+        }
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        db = new LogDatabase(this);
         return START_STICKY;
     }
 

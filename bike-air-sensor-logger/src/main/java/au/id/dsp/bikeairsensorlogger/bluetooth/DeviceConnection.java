@@ -55,6 +55,10 @@ public class DeviceConnection extends Thread {
         return device.getName();
     }
 
+    public String getDeviceAddress() {
+        return device.getAddress();
+    }
+
     public void cancel() {
         try {
             socket.close(); // wake up anything blocked on read()
