@@ -2,6 +2,8 @@ package au.id.dsp.bikeairsensorlogger.bluetooth;
 
 import android.app.Notification;
 import android.app.Service;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 import android.content.Intent;
 import android.location.Location;
@@ -94,16 +96,19 @@ public class BluetoothLoggerService extends Service {
         private LogDatabase.WritableCapture capture;
         private final int id;
         private final DeviceDescriptor descriptor;
-        private final DeviceConnection connection;
+        private DeviceConnection connection;
         private int messageCount;
 
         public DeviceHandler(String address) {
             this.id = nextHandlerId++;
-            connection = new DeviceConnection(address, this);
-            this.descriptor = new DeviceDescriptor(connection.getDeviceAddress(), connection.getDeviceName());
+            BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(address);
+            this.descriptor = new DeviceDescriptor(device.getAddress(), device.getName());
         }
 
         public DeviceHandler connect() {
+            if (connection != null && connection.isAlive())
+                throw new IllegalStateException();
+            connection = new DeviceConnection(descriptor.address, this);
             connection.start();
             capture = db.createCapture(descriptor.address, descriptor.name);
             return this;

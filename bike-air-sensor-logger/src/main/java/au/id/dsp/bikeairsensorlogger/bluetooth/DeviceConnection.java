@@ -33,6 +33,7 @@ public class DeviceConnection extends Thread {
     private BluetoothSocket socket;
     private State state;
     private final AtomicBoolean running = new AtomicBoolean(true);
+    private final AtomicBoolean closedExplicitly = new AtomicBoolean(false);
 
     public DeviceConnection(String address, Handler handler) {
         super("DeviceConnector " + address);
@@ -61,6 +62,7 @@ public class DeviceConnection extends Thread {
 
     public void cancel() {
         try {
+            closedExplicitly.set(true);
             socket.close(); // wake up anything blocked on read()
         } catch (IOException e) {
             // I'll hope that the thread gets its own exception
@@ -100,7 +102,10 @@ public class DeviceConnection extends Thread {
         } finally {
             try {
                 socket.close();
-                setState(State.CLOSED, null);
+                if (closedExplicitly.get())
+                    setState(State.CLOSED, null);
+                else
+                    setState(State.ERROR, error);
             } catch (IOException e) {
                 setState(State.ERROR, error == null ? e : error);
             }
