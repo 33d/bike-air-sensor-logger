@@ -18,7 +18,8 @@ public class CaptureProvider extends ContentProvider {
     public static final String AUTHORITY = "au.id.dsp.bikeairsensorlogger.bluetooth.CaptureProvider";
     public static final int CAPTURES = 100;
     public static final int CAPTURE = 110;
-    public static final Uri CONTENT_URI = Uri.parse("content://" + AUTHORITY + "/captures");
+    public static final int CAPTURES_WITH_COUNTS = 120;
+    public static final Uri CAPTURES_WITH_COUNTS_URI = Uri.parse("content://" + AUTHORITY + "/captureswithcounts");
 
     public static final String CONTENT_ITEM_TYPE = ContentResolver.CURSOR_ITEM_BASE_TYPE + "/captures";
     public static final String CONTENT_TYPE = ContentResolver.CURSOR_DIR_BASE_TYPE + "/captures";
@@ -27,6 +28,7 @@ public class CaptureProvider extends ContentProvider {
     static {
         uriMatcher.addURI(AUTHORITY, "captures", CAPTURES);
         uriMatcher.addURI(AUTHORITY, "captures/#", CAPTURE);
+        uriMatcher.addURI(AUTHORITY, "captureswithcounts", CAPTURES_WITH_COUNTS);
     }
 
     private LogDatabase db;
@@ -46,13 +48,17 @@ public class CaptureProvider extends ContentProvider {
     @Override
     public Cursor query(Uri uri, String[] projection, String selection, String[] selectArgs, String sortOrder) {
         SQLiteQueryBuilder builder = new SQLiteQueryBuilder();
-        builder.setTables("CAPTURE");
 
         switch (uriMatcher.match(uri)) {
             case CAPTURE:
+                builder.setTables("CAPTURE");
                 builder.appendWhere(BaseColumns._ID + "=" + uri.getLastPathSegment());
                 break;
             case CAPTURES:
+                builder.setTables("CAPTURE");
+                break;
+            case CAPTURES_WITH_COUNTS:
+                builder.setTables("CAPTURECOUNTS");
                 break;
             default:
                 throw new RuntimeException("Unknown URI " + uri);

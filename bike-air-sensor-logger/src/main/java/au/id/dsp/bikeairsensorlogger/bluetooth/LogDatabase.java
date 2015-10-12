@@ -44,11 +44,16 @@ public class LogDatabase implements Closeable {
                 + "TIME INTEGER, "
                 + "TEXT TEXT"
             + ");");
+            db.execSQL("CREATE VIEW CAPTURECOUNTS AS "
+                    + "SELECT C." + BaseColumns._ID + " AS " + BaseColumns._ID + ", C.ADDRESS AS ADDRESS, C.NAME AS NAME, C.START AS START, C.END AS END, COUNT(L." + BaseColumns._ID + ") AS COUNT "
+                    + "FROM CAPTURE AS C "
+                    + "INNER JOIN LOG AS L "
+                    + "ON C." + BaseColumns._ID + "=L.CAPTURE "
+                    + "GROUP BY C." + BaseColumns._ID + ";");
         }
 
         @Override
-        public void onUpgrade(SQLiteDatabase sqLiteDatabase, int i, int i1) {
-
+        public void onUpgrade(SQLiteDatabase db, int oldVer, int newVer) {
         }
     }
 
@@ -64,6 +69,14 @@ public class LogDatabase implements Closeable {
 
         public Cursor createCursor() {
             return db.rawQuery("SELECT " + BaseColumns._ID + ", ADDRESS, NAME, START, END FROM CAPTURE ORDER BY START", new String[0]);
+        }
+
+        public Cursor createCountCursor() {
+            return db.rawQuery("SELECT C." + BaseColumns._ID + ", C.ADDRESS AS ADDRESS, C.NAME AS NAME, C.START AS START, C.END AS END, COUNT(L." + BaseColumns._ID + ") AS COUNT "
+                    + "FROM CAPTURE AS C "
+                    + "INNER JOIN LOG AS L "
+                    + "ON C." + BaseColumns._ID + "=L.CAPTURE "
+                    + "ORDER BY START", new String[0]);
         }
 
         @Override

@@ -49,10 +49,10 @@ public class CaptureListFragment extends ListFragment {
     private final LoaderManager.LoaderCallbacks<Cursor> loaderCallbacks = new LoaderManager.LoaderCallbacks<Cursor>() {
         @Override
         public Loader<Cursor> onCreateLoader(int id, Bundle args) {
-            return new CursorLoader(getActivity(), CaptureProvider.CONTENT_URI,
+            return new CursorLoader(getActivity(), CaptureProvider.CAPTURES_WITH_COUNTS_URI,
                     null, // return all columns
                     null, null, // all rows
-                    BaseColumns._ID);
+                    "START");
         }
 
         @Override
@@ -84,12 +84,12 @@ public class CaptureListFragment extends ListFragment {
         logDatabase = new LogDatabase(activity);
         super.onAttach(activity);
 
-        final Cursor cursor = logDatabase.getCaptures().createCursor();
+        final Cursor cursor = logDatabase.getCaptures().createCountCursor();
         adapter = new SimpleCursorAdapter(activity,
                 R.layout.fragment_capture_list_row,
-                cursor,
-                new String[] { "NAME", "START" },
-                new int[] { R.id.nameView, R.id.startTimeView },
+                null, // cursor not available yet
+                new String[] { "NAME", "START", "COUNT" },
+                new int[] { R.id.nameView, R.id.startTimeView, R.id.countView },
                 0);
         adapter.setViewBinder(new SimpleCursorAdapter.ViewBinder() {
             @Override
