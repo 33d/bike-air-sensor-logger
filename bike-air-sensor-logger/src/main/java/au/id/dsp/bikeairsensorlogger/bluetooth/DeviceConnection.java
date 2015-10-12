@@ -7,12 +7,8 @@ import android.os.Handler;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
-import java.util.Date;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import au.id.dsp.bikeairsensorlogger.activity.DeviceControlActivity;
 
 /**
  * Created by damien on 6/10/15.

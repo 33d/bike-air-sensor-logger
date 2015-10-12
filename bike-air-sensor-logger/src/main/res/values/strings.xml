@@ -46,4 +46,5 @@
 
     <string name="need_clean">Clear previous command</string>
     <string name="need_clean_summary">Cleanup command view after sending</string>
+    <string name="title_activity_capture_list">Capture list</string>
 </resources>

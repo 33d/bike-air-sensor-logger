@@ -5,7 +5,7 @@
         android:title="Start logging" />
 
     <item
-        android:id="@+id/menu_send"
+        android:id="@+id/menu_send_log"
         android:orderInCategory="100"
         android:showAsAction="never"
         android:title="@string/menu_send" />

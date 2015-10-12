@@ -62,9 +62,13 @@ public class LogDatabase implements Closeable {
             return c.getCount();
         }
 
+        public Cursor createCursor() {
+            return db.rawQuery("SELECT " + BaseColumns._ID + ", ADDRESS, NAME, START, END FROM CAPTURE ORDER BY START", new String[0]);
+        }
+
         @Override
         public Iterator<Capture> iterator() {
-            final Cursor c = db.rawQuery("SELECT " + BaseColumns._ID + ", ADDRESS, NAME, START, END FROM CAPTURE", new String[0]);
+            final Cursor c = createCursor();
             final int idIndex = c.getColumnIndexOrThrow(BaseColumns._ID);
             return new Iterator<Capture>() {
                 @Override
@@ -153,7 +157,7 @@ public class LogDatabase implements Closeable {
         }
     }
 
-    private final SQLiteDatabase db;
+    final SQLiteDatabase db;
 
     public LogDatabase(Context context) {
         db = new DBHelper(context).getWritableDatabase();
@@ -171,6 +175,12 @@ public class LogDatabase implements Closeable {
 
     public Captures getCaptures() {
         return new Captures();
+    }
+
+    public long getCaptureSize(long id) {
+        Cursor c = db.rawQuery("SELECT COUNT(*) FROM LOG WHERE CAPTURE=?",
+                new String[] { Long.toString(id) });
+        return c.getCount();
     }
 
     @Override
