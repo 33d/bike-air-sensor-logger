@@ -10,6 +10,7 @@
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/Theme.Sherlock" >
+
         <activity
             android:name=".activity.BaseActivity"
             android:label="Captures"
@@ -19,6 +20,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".bluetooth.DeviceListActivity"
+            android:label="@string/select_device"
+            android:theme="@style/DialogTheme" />
 
         <service android:name=".bluetooth.BluetoothLoggerService" />
 

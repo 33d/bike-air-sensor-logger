@@ -1,8 +1,8 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
-        android:id="@+id/menu_start"
-        android:showAsAction="ifRoom|withText"
-        android:title="Start logging" />
+        android:id="@+id/menu_start_capture"
+        android:showAsAction="ifRoom"
+        android:title="Start capture" />
 
     <item
         android:id="@+id/menu_send_log"
