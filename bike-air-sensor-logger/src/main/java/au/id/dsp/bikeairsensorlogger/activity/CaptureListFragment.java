@@ -39,16 +39,7 @@ import au.id.dsp.bikeairsensorlogger.bluetooth.LogDatabase;
 
 public class CaptureListFragment extends ListFragment {
 
-    private static final DateFormat dateFormat;
-    static {
-        DateFormat f = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT);
-        if (f instanceof SimpleDateFormat)
-            // Add the time zone
-            f = new SimpleDateFormat(((SimpleDateFormat) f).toPattern() + " z");
-        else
-            f = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
-        dateFormat = f;
-    }
+    private static final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
 
     private LogDatabase logDatabase;
     private SimpleCursorAdapter adapter;
