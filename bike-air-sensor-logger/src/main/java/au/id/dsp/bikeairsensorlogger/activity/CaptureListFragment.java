@@ -20,6 +20,7 @@ import android.support.v4.content.Loader;
 import android.support.v4.util.LongSparseArray;
 import android.support.v4.widget.SimpleCursorAdapter;
 import android.util.Log;
+import android.util.SparseArray;
 import android.view.View;
 import android.widget.ListView;
 import android.widget.TextView;
@@ -62,20 +63,35 @@ public class CaptureListFragment extends ListFragment {
 
     private final ServiceConnection loggerServiceConnection = new ServiceConnection() {
         private final Handler loggerHandler = new Handler(Looper.getMainLooper()) {
+            /** The database ID for each capture ID */
+            private SparseArray<Long> dbIDs = new SparseArray<>();
             @Override
             public void handleMessage(Message msg) {
                 switch (msg.what) {
                     case BluetoothLoggerService.MESSAGE_UPDATE:
-                        if (msg.arg2 == DeviceConnection.State.IDLE.ordinal())
+                        if (msg.arg2 == DeviceConnection.State.IDLE.ordinal()) {
                             // Ooh, it's new!
                             getLoaderManager().restartLoader(0, null, loaderCallbacks);
-                        else {
-                            // Do we care about this ID?
+                            dbIDs.put(msg.arg1, ((BluetoothLoggerService.Device) msg.obj).getDbid());
+                        } else {
+                            // Find the view for this ID, if it's being used
                             WeakReference<View> ref = views.get(((BluetoothLoggerService.Device) msg.obj).getDbid());
                             View view = ref == null ? null : ref.get();
-                            if (view != null)
-                                ((TextView) view.findViewById(R.id.statusView)).setText(DeviceConnection.State.values()[msg.arg2].toString());
+                            if (msg.arg2 == DeviceConnection.State.CLOSED.ordinal()) {
+                                dbIDs.remove(msg.arg1);
+                                if (view != null)
+                                    ((TextView) view.findViewById(R.id.statusView)).setText("");
+                            } else {
+                                if (view != null)
+                                    ((TextView) view.findViewById(R.id.statusView)).setText(DeviceConnection.State.values()[msg.arg2].toString());
+                            }
                         }
+                        break;
+                    case BluetoothLoggerService.MESSAGE_READ:
+                        WeakReference<View> ref = views.get(dbIDs.get(msg.arg1));
+                        View view = ref == null ? null : ref.get();
+                        if (view != null)
+                            ((TextView) view.findViewById(R.id.countView)).setText(Integer.toString(msg.arg2));
                         break;
                 }
             }
