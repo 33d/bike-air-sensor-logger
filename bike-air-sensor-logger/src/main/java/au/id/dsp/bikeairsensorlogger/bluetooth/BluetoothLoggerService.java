@@ -6,14 +6,9 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 import android.content.Intent;
-import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
-import android.os.Messenger;
 import android.util.Log;
 
 import java.io.IOException;
@@ -82,35 +77,63 @@ public class BluetoothLoggerService extends Service {
     private final Binder clientBinder = new Binder();
     private LogDatabase db;
 
-    public static class DeviceDescriptor {
-        public final String address;
-        public final String name;
+    /** Details of a remote device.  These methods are thread safe. */
+    public abstract static class Device {
+        private final String address;
+        private final String name;
+        private long dbid;
+        private final AtomicReference<Throwable> lastError = new AtomicReference<>();
 
-        private DeviceDescriptor(String address, String name) {
+        private Device(String address, String name) {
             this.address = address;
             this.name = name;
         }
+
+        public String getAddress() {
+            return address;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public long getDbid() {
+            return dbid;
+        }
+
+        public Throwable getLastError() {
+            return lastError.get();
+        }
+
+        public abstract DeviceConnection.State getState();
     }
 
     private final class DeviceHandler extends Handler {
         private LogDatabase.WritableCapture capture;
         private final int id;
-        private final DeviceDescriptor descriptor;
+        private final Device descriptor;
         private DeviceConnection connection;
         private int messageCount;
 
         public DeviceHandler(String address) {
             this.id = nextHandlerId++;
             BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(address);
-            this.descriptor = new DeviceDescriptor(device.getAddress(), device.getName());
+            this.descriptor = new Device(device.getAddress(), device.getName()) { // yuck
+                @Override
+                public DeviceConnection.State getState() {
+                    return connection.getConnectionState();
+                }
+            };
         }
 
         public DeviceHandler connect() {
             if (connection != null && connection.isAlive())
                 throw new IllegalStateException();
-            connection = new DeviceConnection(descriptor.address, this);
+            connection = new DeviceConnection(descriptor.getAddress(), this);
             connection.start();
-            capture = db.createCapture(descriptor.address, descriptor.name);
+            capture = db.createCapture(descriptor.getAddress(), descriptor.getName());
+            descriptor.dbid = capture.getKey();
+            sendToClients(MESSAGE_UPDATE, connection.getConnectionState().ordinal(), descriptor);
             return this;
         }
 
@@ -150,7 +173,8 @@ public class BluetoothLoggerService extends Service {
                     connect();
                     break;
                 case DeviceConnection.MESSAGE_STATE_CHANGE:
-                    sendToClients(MESSAGE_UPDATE, msg.arg1, (Throwable) msg.obj);
+                    descriptor.lastError.set((Throwable) msg.obj);
+                    sendToClients(MESSAGE_UPDATE, msg.arg1, descriptor);
                     if (DeviceConnection.State.ERROR.ordinal() == msg.arg1)
                         sendMessageDelayed(obtainMessage(MESSAGE_RETRYCONNECT), 10000);
                     else if (DeviceConnection.State.CLOSED.ordinal() == msg.arg1)
@@ -188,7 +212,7 @@ public class BluetoothLoggerService extends Service {
     }
 
     private synchronized void handlerFinished(DeviceHandler handler) {
-        handlers.remove(handler.descriptor.address);
+        handlers.remove(handler.descriptor.getAddress());
         if (handlers.isEmpty()) {
             stopForeground(true);
             try {

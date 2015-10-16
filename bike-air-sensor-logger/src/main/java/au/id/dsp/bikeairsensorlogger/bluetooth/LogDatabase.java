@@ -47,7 +47,7 @@ public class LogDatabase implements Closeable {
             db.execSQL("CREATE VIEW CAPTURECOUNTS AS "
                     + "SELECT C." + BaseColumns._ID + " AS " + BaseColumns._ID + ", C.ADDRESS AS ADDRESS, C.NAME AS NAME, C.START AS START, C.END AS END, COUNT(L." + BaseColumns._ID + ") AS COUNT "
                     + "FROM CAPTURE AS C "
-                    + "INNER JOIN LOG AS L "
+                    + "LEFT  JOIN LOG AS L "
                     + "ON C." + BaseColumns._ID + "=L.CAPTURE "
                     + "GROUP BY C." + BaseColumns._ID + ";");
         }

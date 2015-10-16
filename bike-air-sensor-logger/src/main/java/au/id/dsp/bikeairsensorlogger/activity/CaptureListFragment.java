@@ -2,28 +2,35 @@ package au.id.dsp.bikeairsensorlogger.activity;
 
 
 import android.app.Activity;
-import android.content.Context;
+import android.content.ComponentName;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.database.Cursor;
 import android.os.Bundle;
-import android.provider.BaseColumns;
+import android.os.Handler;
+import android.os.IBinder;
+import android.os.Looper;
+import android.os.Message;
 import android.support.v4.app.ListFragment;
 import android.support.v4.app.LoaderManager;
 import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
+import android.support.v4.util.LongSparseArray;
 import android.support.v4.widget.SimpleCursorAdapter;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.ListView;
 import android.widget.TextView;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
 import au.id.dsp.bikeairsensorlogger.R;
+import au.id.dsp.bikeairsensorlogger.bluetooth.BluetoothLoggerService;
 import au.id.dsp.bikeairsensorlogger.bluetooth.CaptureProvider;
+import au.id.dsp.bikeairsensorlogger.bluetooth.DeviceConnection;
 import au.id.dsp.bikeairsensorlogger.bluetooth.LogDatabase;
 
 public class CaptureListFragment extends ListFragment {
@@ -43,8 +50,44 @@ public class CaptureListFragment extends ListFragment {
     private SimpleCursorAdapter adapter;
     private ListView view;
 
+    /** Any views that are currently active */
+    private final LongSparseArray<WeakReference<View>> views = new LongSparseArray<>();
+
     public CaptureListFragment() {
     }
+
+    private final ServiceConnection loggerServiceConnection = new ServiceConnection() {
+        private final Handler loggerHandler = new Handler(Looper.getMainLooper()) {
+            @Override
+            public void handleMessage(Message msg) {
+                switch (msg.what) {
+                    case BluetoothLoggerService.MESSAGE_UPDATE:
+                        if (msg.arg2 == DeviceConnection.State.IDLE.ordinal())
+                            // Ooh, it's new!
+                            getLoaderManager().restartLoader(0, null, loaderCallbacks);
+                        else {
+                            // Do we care about this ID?
+                            WeakReference<View> ref = views.get(((BluetoothLoggerService.Device) msg.obj).getDbid());
+                            View view = ref == null ? null : ref.get();
+                            if (view != null)
+                                ((TextView) view.findViewById(R.id.statusView)).setText(DeviceConnection.State.values()[msg.arg2].toString());
+                        }
+                        break;
+                }
+            }
+        };
+
+        @Override
+        public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
+            BluetoothLoggerService.Binder binder = (BluetoothLoggerService.Binder) iBinder;
+            binder.register(loggerHandler);
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName componentName) {
+            loggerHandler.removeCallbacksAndMessages(null);
+        }
+    };
 
     private final LoaderManager.LoaderCallbacks<Cursor> loaderCallbacks = new LoaderManager.LoaderCallbacks<Cursor>() {
         @Override
@@ -84,7 +127,6 @@ public class CaptureListFragment extends ListFragment {
         logDatabase = new LogDatabase(activity);
         super.onAttach(activity);
 
-        final Cursor cursor = logDatabase.getCaptures().createCountCursor();
         adapter = new SimpleCursorAdapter(activity,
                 R.layout.fragment_capture_list_row,
                 null, // cursor not available yet
@@ -102,6 +144,9 @@ public class CaptureListFragment extends ListFragment {
             }
         });
         setListAdapter(adapter);
+
+        final Intent intent = new Intent(activity, BluetoothLoggerService.class);
+        activity.bindService(intent, loggerServiceConnection, 0);
     }
 
     @Override
@@ -112,6 +157,7 @@ public class CaptureListFragment extends ListFragment {
     @Override
     public void onDetach() {
         super.onDetach();
+        getActivity().unbindService(loggerServiceConnection);
         try {
             logDatabase.close();
         } catch (IOException e) {
