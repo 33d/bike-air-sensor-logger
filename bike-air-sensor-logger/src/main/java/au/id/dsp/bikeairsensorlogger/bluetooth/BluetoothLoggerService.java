@@ -73,6 +73,10 @@ public class BluetoothLoggerService extends Service {
             }
             return h == null ? false : !notActiveStates.contains(h.getState().ordinal());
         }
+
+        public Device getDevice(String address) {
+            return handlers.get(address).descriptor;
+        }
     };
     private final Binder clientBinder = new Binder();
     private LogDatabase db;
@@ -124,6 +128,8 @@ public class BluetoothLoggerService extends Service {
                     return connection.getConnectionState();
                 }
             };
+            capture = db.createCapture(descriptor.getAddress(), descriptor.getName());
+            descriptor.dbid = capture.getKey();
         }
 
         public DeviceHandler connect() {
@@ -131,8 +137,6 @@ public class BluetoothLoggerService extends Service {
                 throw new IllegalStateException();
             connection = new DeviceConnection(descriptor.getAddress(), this);
             connection.start();
-            capture = db.createCapture(descriptor.getAddress(), descriptor.getName());
-            descriptor.dbid = capture.getKey();
             sendToClients(MESSAGE_UPDATE, connection.getConnectionState().ordinal(), descriptor);
             return this;
         }
