@@ -73,8 +73,12 @@ public class CaptureListFragment extends ListFragment {
                                 if (view != null)
                                     ((TextView) view.findViewById(R.id.statusView)).setText("");
                             } else {
-                                if (view != null)
-                                    ((TextView) view.findViewById(R.id.statusView)).setText(DeviceConnection.State.values()[msg.arg2].toString());
+                                if (view != null) {
+                                    String text = msg.arg2 == DeviceConnection.State.ERROR.ordinal()
+                                        ? ((BluetoothLoggerService.Device) msg.obj).getLastError().getLocalizedMessage()
+                                        : DeviceConnection.State.values()[msg.arg2].toString();
+                                    ((TextView) view.findViewById(R.id.statusView)).setText(text);
+                                }
                             }
                         }
                         break;

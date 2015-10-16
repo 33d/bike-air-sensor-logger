@@ -26,19 +26,19 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="New Text"
-        android:id="@+id/countView"
+        android:id="@+id/statusView"
         android:layout_below="@+id/startTimeView"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true"
-        android:layout_toLeftOf="@+id/statusView"
-        android:layout_toStartOf="@+id/statusView" />
+        android:layout_toLeftOf="@+id/countView"
+        android:layout_toStartOf="@+id/countView" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="New Text"
-        android:id="@+id/statusView"
-        android:layout_alignTop="@+id/countView"
+        android:id="@+id/countView"
+        android:layout_alignTop="@+id/statusView"
         android:layout_alignParentRight="true"
         android:layout_alignParentEnd="true" />
 
