@@ -16,6 +16,7 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -74,8 +75,9 @@ public class BluetoothLoggerService extends Service {
             return h == null ? false : !notActiveStates.contains(h.getState().ordinal());
         }
 
-        public Device getDevice(String address) {
-            return handlers.get(address).descriptor;
+        public Device getDevice(long dbid) {
+            DeviceHandler h = handlersByDbId.get(dbid);
+            return h == null ? null : h.descriptor;
         }
     };
     private final Binder clientBinder = new Binder();
@@ -85,6 +87,8 @@ public class BluetoothLoggerService extends Service {
     public abstract static class Device {
         private final String address;
         private final String name;
+        // Having this writable is gross; Device objects should only be
+        // returned once the database record is created
         private long dbid;
         private final AtomicReference<Throwable> lastError = new AtomicReference<>();
 
@@ -128,7 +132,9 @@ public class BluetoothLoggerService extends Service {
                     return connection.getConnectionState();
                 }
             };
+            // TODO: This should happen on another thread
             capture = db.createCapture(descriptor.getAddress(), descriptor.getName());
+            handlersByDbId.put(capture.getKey(), this);
             descriptor.dbid = capture.getKey();
         }
 
@@ -194,6 +200,7 @@ public class BluetoothLoggerService extends Service {
     }
 
     private final Map<String, DeviceHandler> handlers = new HashMap<String, DeviceHandler>();
+    private final Map<Long, DeviceHandler> handlersByDbId = Collections.synchronizedMap(new HashMap<Long, DeviceHandler>());
 
     @SuppressWarnings("deprecation") // (NotificationBuilder is not available in API 10)
     private synchronized void connect(Context context, String address) {
@@ -217,6 +224,7 @@ public class BluetoothLoggerService extends Service {
 
     private synchronized void handlerFinished(DeviceHandler handler) {
         handlers.remove(handler.descriptor.getAddress());
+        handlersByDbId.remove(handler.descriptor.dbid);
         if (handlers.isEmpty()) {
             stopForeground(true);
             try {

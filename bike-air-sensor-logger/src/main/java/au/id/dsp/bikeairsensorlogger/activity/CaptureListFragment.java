@@ -3,6 +3,7 @@ package au.id.dsp.bikeairsensorlogger.activity;
 
 import android.app.Activity;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.database.Cursor;
@@ -11,12 +12,14 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
+import android.provider.BaseColumns;
 import android.support.v4.app.ListFragment;
 import android.support.v4.app.LoaderManager;
 import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
 import android.support.v4.util.LongSparseArray;
 import android.support.v4.widget.SimpleCursorAdapter;
+import android.util.Log;
 import android.view.View;
 import android.widget.ListView;
 import android.widget.TextView;
@@ -49,6 +52,7 @@ public class CaptureListFragment extends ListFragment {
     private LogDatabase logDatabase;
     private SimpleCursorAdapter adapter;
     private ListView view;
+    private BluetoothLoggerService.Binder service;
 
     /** Any views that are currently active */
     private final LongSparseArray<WeakReference<View>> views = new LongSparseArray<>();
@@ -79,8 +83,8 @@ public class CaptureListFragment extends ListFragment {
 
         @Override
         public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
-            BluetoothLoggerService.Binder binder = (BluetoothLoggerService.Binder) iBinder;
-            binder.register(loggerHandler);
+            service = (BluetoothLoggerService.Binder) iBinder;
+            service.register(loggerHandler);
         }
 
         @Override
@@ -132,7 +136,27 @@ public class CaptureListFragment extends ListFragment {
                 null, // cursor not available yet
                 new String[] { "NAME", "START", "COUNT" },
                 new int[] { R.id.nameView, R.id.startTimeView, R.id.countView },
-                0);
+                0) {
+            @Override
+            public void bindView(View view, Context context, Cursor cursor) {
+                // Is this view being recycled?
+                if (view != null && view.getTag() != null)
+                    views.remove((Long) view.getTag());
+                super.bindView(view, context, cursor);
+                long id = cursor.getLong(cursor.getColumnIndex(BaseColumns._ID));
+                // If this is a live capture, provide status updates
+                String status = "";
+                if (service != null) {
+                    BluetoothLoggerService.Device device = service.getDevice(cursor.getLong(cursor.getColumnIndex(BaseColumns._ID)));
+                    if (device != null) {
+                        status = device.getState().toString();
+                        view.setTag(id);
+                        views.put(id, new WeakReference<View>(view));
+                    }
+                }
+                ((TextView) view.findViewById(R.id.statusView)).setText(status);
+            }
+        };
         adapter.setViewBinder(new SimpleCursorAdapter.ViewBinder() {
             @Override
             public boolean setViewValue(View view, Cursor cursor, int columnIndex) {
