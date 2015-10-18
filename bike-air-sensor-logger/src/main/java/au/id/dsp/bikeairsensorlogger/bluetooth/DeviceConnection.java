@@ -59,7 +59,10 @@ public class DeviceConnection extends Thread {
     public void cancel() {
         try {
             closedExplicitly.set(true);
-            socket.close(); // wake up anything blocked on read()
+            // Synchronized prevents "ABORTING: INVALID HEAP ADDRESS IN dlfree" in android 4.0.4
+            synchronized (this) {
+                socket.close(); // wake up anything blocked on read()
+            }
         } catch (IOException e) {
             // I'll hope that the thread gets its own exception
         }
@@ -97,7 +100,10 @@ public class DeviceConnection extends Thread {
             error = e;
         } finally {
             try {
-                socket.close();
+                // Synchronized prevents "ABORTING: INVALID HEAP ADDRESS IN dlfree" in android 4.0.4
+                synchronized (this) {
+                    socket.close();
+                }
                 if (closedExplicitly.get())
                     setState(State.CLOSED, null);
                 else

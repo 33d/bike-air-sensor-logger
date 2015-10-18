@@ -5,6 +5,14 @@
         android:title="Start capture" />
 
     <item
+        android:id="@+id/menu_stop_capture"
+        android:title="Stop capture" />
+
+    <item
+        android:id="@+id/menu_delete_capture"
+        android:title="Delete capture" />
+
+    <item
         android:id="@+id/menu_send_log"
         android:orderInCategory="100"
         android:showAsAction="never"

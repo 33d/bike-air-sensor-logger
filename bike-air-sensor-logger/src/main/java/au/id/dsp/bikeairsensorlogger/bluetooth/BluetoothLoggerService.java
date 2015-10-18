@@ -10,6 +10,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.util.Log;
+import android.util.SparseArray;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -58,19 +59,19 @@ public class BluetoothLoggerService extends Service {
         public void register(Handler handler) {
             synchronized (BluetoothLoggerService.this) {
                 clients.add(new WeakReference<Handler>(handler));
-                for (DeviceHandler deviceHandler : handlers.values())
-                    deviceHandler.sendState(handler);
+                for (int i = 0 ; i < handlers.size(); i++)
+                    handlers.valueAt(i).sendState(handler);
             }
         }
 
-        public void disconnect(String address) {
-            BluetoothLoggerService.this.disconnect(address);
+        public void disconnect(Device device) {
+            BluetoothLoggerService.this.disconnect(device);
         }
 
-        public boolean isConnected(String address) {
+        public boolean isConnected(Device device) {
             DeviceHandler h = null;
             synchronized(BluetoothLoggerService.this) {
-                h = handlers.get(address);
+                h = handlers.get(device.id);
             }
             return h == null ? false : !notActiveStates.contains(h.getState().ordinal());
         }
@@ -85,6 +86,7 @@ public class BluetoothLoggerService extends Service {
 
     /** Details of a remote device.  These methods are thread safe. */
     public abstract static class Device {
+        private final int id;
         private final String address;
         private final String name;
         // Having this writable is gross; Device objects should only be
@@ -92,7 +94,8 @@ public class BluetoothLoggerService extends Service {
         private long dbid;
         private final AtomicReference<Throwable> lastError = new AtomicReference<>();
 
-        private Device(String address, String name) {
+        private Device(int id, String address, String name) {
+            this.id = id;
             this.address = address;
             this.name = name;
         }
@@ -126,8 +129,8 @@ public class BluetoothLoggerService extends Service {
         public DeviceHandler(String address) {
             this.id = nextHandlerId++;
             BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(address);
-            this.descriptor = new Device(device.getAddress(), device.getName()) { // yuck
-                @Override
+            this.descriptor = new Device(id, device.getAddress(), device.getName()) {
+                @Override  // yuck
                 public DeviceConnection.State getState() {
                     return connection.getConnectionState();
                 }
@@ -199,7 +202,7 @@ public class BluetoothLoggerService extends Service {
         }
     }
 
-    private final Map<String, DeviceHandler> handlers = new HashMap<String, DeviceHandler>();
+    private final SparseArray<DeviceHandler> handlers = new SparseArray<DeviceHandler>();
     private final Map<Long, DeviceHandler> handlersByDbId = Collections.synchronizedMap(new HashMap<Long, DeviceHandler>());
 
     @SuppressWarnings("deprecation") // (NotificationBuilder is not available in API 10)
@@ -208,24 +211,19 @@ public class BluetoothLoggerService extends Service {
                 "Starting logger", System.currentTimeMillis());
         notification.setLatestEventInfo(context, "Bluetooth logger running", "", null);
         startForeground(nextNotificationId.getAndIncrement(), notification);
-        handlers.put(address, new DeviceHandler(address).connect());
+        DeviceHandler handler = new DeviceHandler(address);
+        handlers.put(handler.id, handler);
+        handler.connect();
     }
 
-    /** Initiates disconnection.  The connection isn't closed until the
-     * {@link au.id.dsp.bikeairsensorlogger.bluetooth.DeviceConnection.State#CLOSED} state is sent.
-     */
-    private void disconnect(String address) {
-        DeviceHandler handler = null;
-        synchronized (this) {
-            handler = handlers.get(address);
-        }
-        handler.disconnect();
+    public void disconnect(Device device) {
+        handlers.get(device.id).disconnect();
     }
 
     private synchronized void handlerFinished(DeviceHandler handler) {
-        handlers.remove(handler.descriptor.getAddress());
+        handlers.remove(handler.id);
         handlersByDbId.remove(handler.descriptor.dbid);
-        if (handlers.isEmpty()) {
+        if (handlers.size() == 0) {
             stopForeground(true);
             try {
                 db.close();

@@ -19,9 +19,11 @@ import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
 import android.support.v4.util.LongSparseArray;
 import android.support.v4.widget.SimpleCursorAdapter;
-import android.util.Log;
 import android.util.SparseArray;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.AbsListView;
 import android.widget.ListView;
 import android.widget.TextView;
 
@@ -50,6 +52,11 @@ public class CaptureListFragment extends ListFragment {
     private final LongSparseArray<WeakReference<View>> views = new LongSparseArray<>();
 
     public CaptureListFragment() {
+    }
+
+    @Override
+    public void onViewCreated(View view, Bundle savedInstanceState) {
+        getListView().setChoiceMode(AbsListView.CHOICE_MODE_MULTIPLE);
     }
 
     private final ServiceConnection loggerServiceConnection = new ServiceConnection() {

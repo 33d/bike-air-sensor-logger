@@ -8,6 +8,10 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.support.v4.app.ListFragment;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ListView;
 
 import com.actionbarsherlock.app.SherlockFragmentActivity;
 import com.actionbarsherlock.view.Menu;
@@ -29,12 +33,12 @@ public class BaseActivity extends SherlockFragmentActivity {
     static final int REQUEST_CONNECT_DEVICE = 1;
     static final int REQUEST_ENABLE_BT = 2;
 
-    private BluetoothLoggerService service;
     BluetoothAdapter btAdapter;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        setContentView(R.layout.base_layout);
 
         btAdapter = BluetoothAdapter.getDefaultAdapter();
         if (btAdapter == null) {
@@ -42,8 +46,6 @@ public class BaseActivity extends SherlockFragmentActivity {
             showAlertDialog(no_bluetooth);
             Utils.log(no_bluetooth);
         }
-
-        setContentView(R.layout.base_layout);
     }
 
     @Override
@@ -52,12 +54,35 @@ public class BaseActivity extends SherlockFragmentActivity {
         return true;
     }
 
+    private long[] getSelectedItems() {
+        View view = getSupportFragmentManager().findFragmentById(R.id.fragment_capture_list).getView();
+        return ((ListView) view.findViewById(android.R.id.list)).getCheckedItemIds();
+    }
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.menu_start_capture:
                 Intent serverIntent = new Intent(this, DeviceListActivity.class);
                 startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE);
+                return true;
+            case R.id.menu_stop_capture:
+                final Intent intent = new Intent(this, BluetoothLoggerService.class);
+                bindService(intent, new ServiceConnection() {
+                    @Override
+                    public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
+                        BluetoothLoggerService.Binder service = ((BluetoothLoggerService.Binder) iBinder);
+                        for (long id: getSelectedItems()) {
+                            BluetoothLoggerService.Device device = service.getDevice(id);
+                            if (device != null)
+                                service.disconnect(device);
+                        }
+                        unbindService(this);
+                    }
+
+                    @Override
+                    public void onServiceDisconnected(ComponentName componentName) {}
+                }, 0);
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
@@ -83,6 +108,8 @@ public class BaseActivity extends SherlockFragmentActivity {
     private void startLogging(final String address) {
         final Intent intent = new Intent(this, BluetoothLoggerService.class);
         startService(intent);
+        // Use a new ServiceConnection, because we've probably been called
+        // before DeviceListActivity returns
         bindService(intent, new ServiceConnection() {
             @Override
             public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
@@ -91,7 +118,8 @@ public class BaseActivity extends SherlockFragmentActivity {
             }
 
             @Override
-            public void onServiceDisconnected(ComponentName componentName) { }
+            public void onServiceDisconnected(ComponentName componentName) {
+            }
         }, 0);
     }
 

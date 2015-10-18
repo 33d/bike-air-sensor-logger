@@ -7,5 +7,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:name="au.id.dsp.bikeairsensorlogger.activity.CaptureListFragment"
-        android:id="@+id/fragment" />
+        android:id="@+id/fragment_capture_list"
+    />
 </LinearLayout>
