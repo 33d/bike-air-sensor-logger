@@ -30,7 +30,8 @@
 
         <provider
             android:authorities="au.id.dsp.bikeairsensorlogger.bluetooth.CaptureProvider"
-            android:multiprocess="true"
+            android:multiprocess="false"
+            android:exported="true"
             android:name="au.id.dsp.bikeairsensorlogger.bluetooth.CaptureProvider"/>
     </application>
 

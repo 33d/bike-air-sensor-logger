@@ -7,6 +7,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.view.View;
@@ -16,9 +17,12 @@ import com.actionbarsherlock.app.SherlockFragmentActivity;
 import com.actionbarsherlock.view.Menu;
 import com.actionbarsherlock.view.MenuItem;
 
+import java.util.ArrayList;
+
 import au.id.dsp.bikeairsensorlogger.R;
 import au.id.dsp.bikeairsensorlogger.Utils;
 import au.id.dsp.bikeairsensorlogger.bluetooth.BluetoothLoggerService;
+import au.id.dsp.bikeairsensorlogger.bluetooth.CaptureProvider;
 import au.id.dsp.bikeairsensorlogger.bluetooth.DeviceListActivity;
 
 /**
@@ -90,6 +94,16 @@ public class BaseActivity extends SherlockFragmentActivity {
             case R.id.menu_delete_capture:
                 getCaptureList().deleteSelected();
                 return true;
+            case R.id.menu_send_log:
+                ArrayList<Uri> uris = new ArrayList<Uri>();
+                for (long id: getSelectedItems())
+                    uris.add(Uri.withAppendedPath(CaptureProvider.CAPTURE_CSV_URI, Long.toString(id)));
+                Intent shareIntent = new Intent();
+                shareIntent.setAction(Intent.ACTION_SEND_MULTIPLE);
+                shareIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
+                shareIntent.setType("application/octet-stream");
+                shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(Intent.createChooser(shareIntent, "Share data to"));
             default:
                 return super.onOptionsItemSelected(item);
         }
