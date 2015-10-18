@@ -19,6 +19,7 @@ public class CaptureProvider extends ContentProvider {
     public static final int CAPTURES = 100;
     public static final int CAPTURE = 110;
     public static final int CAPTURES_WITH_COUNTS = 120;
+    public static final Uri CAPTURES_URI = Uri.parse("content://" + AUTHORITY + "/captures");
     public static final Uri CAPTURES_WITH_COUNTS_URI = Uri.parse("content://" + AUTHORITY + "/captureswithcounts");
 
     public static final String CONTENT_ITEM_TYPE = ContentResolver.CURSOR_ITEM_BASE_TYPE + "/captures";
@@ -32,11 +33,6 @@ public class CaptureProvider extends ContentProvider {
     }
 
     private LogDatabase db;
-
-    @Override
-    public int delete(Uri uri, String s, String[] strings) {
-        return 0;
-    }
 
     @Override
     public boolean onCreate() {
@@ -67,6 +63,18 @@ public class CaptureProvider extends ContentProvider {
         Cursor cursor = builder.query(db.db, projection, selection, selectArgs, null, null, sortOrder);
         cursor.setNotificationUri(getContext().getContentResolver(), uri);
         return cursor;
+    }
+
+    @Override
+    public int delete(Uri uri, String s, String[] strings) {
+        switch (uriMatcher.match(uri)) {
+            case CAPTURE:
+                int r = db.db.delete("CAPTURE",
+                        BaseColumns._ID + "=?",
+                        new String[] { uri.getLastPathSegment() });
+                getContext().getContentResolver().notifyChange(uri, null);
+        }
+        return 0;
     }
 
     @Nullable

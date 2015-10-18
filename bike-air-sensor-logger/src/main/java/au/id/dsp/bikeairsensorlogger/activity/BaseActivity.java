@@ -4,13 +4,12 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.support.v4.app.ListFragment;
 import android.view.View;
-import android.widget.AdapterView;
 import android.widget.ListView;
 
 import com.actionbarsherlock.app.SherlockFragmentActivity;
@@ -54,8 +53,12 @@ public class BaseActivity extends SherlockFragmentActivity {
         return true;
     }
 
+    private CaptureListFragment getCaptureList() {
+        return (CaptureListFragment) getSupportFragmentManager().findFragmentById(R.id.fragment_capture_list);
+    }
+
     private long[] getSelectedItems() {
-        View view = getSupportFragmentManager().findFragmentById(R.id.fragment_capture_list).getView();
+        View view = getCaptureList().getView();
         return ((ListView) view.findViewById(android.R.id.list)).getCheckedItemIds();
     }
 
@@ -82,7 +85,10 @@ public class BaseActivity extends SherlockFragmentActivity {
 
                     @Override
                     public void onServiceDisconnected(ComponentName componentName) {}
-                }, 0);
+                }, Context.BIND_AUTO_CREATE);
+                return true;
+            case R.id.menu_delete_capture:
+                getCaptureList().deleteSelected();
                 return true;
             default:
                 return super.onOptionsItemSelected(item);

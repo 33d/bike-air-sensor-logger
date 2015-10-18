@@ -3,15 +3,20 @@ package au.id.dsp.bikeairsensorlogger.activity;
 
 import android.app.Activity;
 import android.content.ComponentName;
+import android.content.ContentProviderOperation;
 import android.content.Context;
 import android.content.Intent;
+import android.content.OperationApplicationException;
 import android.content.ServiceConnection;
 import android.database.Cursor;
+import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
+import android.os.RemoteException;
 import android.provider.BaseColumns;
 import android.support.v4.app.ListFragment;
 import android.support.v4.app.LoaderManager;
@@ -19,10 +24,9 @@ import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
 import android.support.v4.util.LongSparseArray;
 import android.support.v4.widget.SimpleCursorAdapter;
+import android.util.Log;
 import android.util.SparseArray;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.AbsListView;
 import android.widget.ListView;
 import android.widget.TextView;
@@ -31,6 +35,7 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 
 import au.id.dsp.bikeairsensorlogger.R;
@@ -189,6 +194,71 @@ public class CaptureListFragment extends ListFragment {
 
         final Intent intent = new Intent(activity, BluetoothLoggerService.class);
         activity.bindService(intent, loggerServiceConnection, 0);
+    }
+
+    public void deleteSelected() {
+        final long[] ids = getListView().getCheckedItemIds();
+
+        // Stop any connections first
+        final Intent intent = new Intent(getActivity(), BluetoothLoggerService.class);
+        getActivity().bindService(intent, new ServiceConnection() {
+            final LongSparseArray<Integer> pendingIDs = new LongSparseArray<Integer>();
+
+            private void deleteRecords() {
+                new AsyncTask<Object, Integer, Object>() {
+                    @Override
+                    protected Object doInBackground(Object... objects) {
+                        ArrayList<ContentProviderOperation> ops = new ArrayList<>();
+                        for (long id : ids)
+                            ops.add(ContentProviderOperation.newDelete(Uri.withAppendedPath(CaptureProvider.CAPTURES_URI, Long.toString(id))).build());
+                        try {
+                            getActivity().getContentResolver().applyBatch(CaptureProvider.AUTHORITY, ops);
+                        } catch (RemoteException e) {
+                            throw new RuntimeException(e);
+                        } catch (OperationApplicationException e) {
+                            Log.w("BaseActivity", e.getLocalizedMessage()); // TODO?
+                        }
+                        return null;
+                    }
+
+                    @Override
+                    protected void onPostExecute(Object o) {
+                        super.onPostExecute(o);
+                        getLoaderManager().restartLoader(0, null, loaderCallbacks);
+                    }
+                }.execute(new Object[0]);
+            }
+
+            @Override
+            public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
+                for (long id : ids)
+                    pendingIDs.put(id, 1);
+                BluetoothLoggerService.Binder service = ((BluetoothLoggerService.Binder) iBinder);
+                service.register(new Handler(getActivity().getMainLooper()) {
+                    @Override
+                    public void handleMessage(Message msg) {
+                        if (msg.what == BluetoothLoggerService.MESSAGE_UPDATE && msg.arg2 == DeviceConnection.State.CLOSED.ordinal())
+                            pendingIDs.remove(((BluetoothLoggerService.Device) msg.obj).getDbid());
+                        if (pendingIDs.size() == 0)
+                            deleteRecords();
+                    }
+                });
+                for (long id : ids) {
+                    BluetoothLoggerService.Device device = service.getDevice(id);
+                    if (device != null)
+                        service.disconnect(device);
+                    else
+                        pendingIDs.delete(id);
+                }
+                if (pendingIDs.size() == 0) // all of the captures weren't running
+                    deleteRecords();
+                getActivity().unbindService(this);
+            }
+
+            @Override
+            public void onServiceDisconnected(ComponentName componentName) {
+            }
+        }, Context.BIND_AUTO_CREATE);
     }
 
     @Override
