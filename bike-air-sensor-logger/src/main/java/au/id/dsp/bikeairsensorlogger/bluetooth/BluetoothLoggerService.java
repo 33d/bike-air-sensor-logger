@@ -1,16 +1,25 @@
 package au.id.dsp.bikeairsensorlogger.bluetooth;
 
 import android.app.Notification;
+import android.app.NotificationManager;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 import android.content.Intent;
+import android.location.Criteria;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.service.notification.NotificationListenerService;
+import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 import android.util.SparseArray;
+import android.widget.Toast;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -39,7 +48,6 @@ public class BluetoothLoggerService extends Service {
     public static final String EXTRA_MESSENGER = "au.id.dsp.bikeairsensorlogger.bluetooth.BluetoothLoggerService.EXTRA_MESSENGER";
     public static final String KEY_ERROR = "au.id.dsp.bikeairsensorlogger.bluetooth.BluetoothLoggerService.ERROR";
     private static volatile int nextHandlerId = 0;
-    private static final AtomicInteger nextNotificationId = new AtomicInteger(1);
 
     /** Which states initiate a reconnection */
     private static final Collection<Integer> notActiveStates = Arrays.asList(
@@ -83,6 +91,36 @@ public class BluetoothLoggerService extends Service {
     };
     private final Binder clientBinder = new Binder();
     private LogDatabase db;
+    private LocationManager locationManager;
+    private final AtomicReference<Location> lastLocation = new AtomicReference<>();
+    private class GPSListener implements LocationListener {
+        private final Notification noGPSNotification = new NotificationCompat.Builder(BluetoothLoggerService.this)
+                .setContentTitle("GPS is turned off")
+                .setSmallIcon(R.drawable.ic_status_warning)
+                .setPriority(Notification.PRIORITY_HIGH)
+                .build();
+        NotificationManager notificationManager =
+                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+        @Override
+        public void onLocationChanged(Location location) {
+            lastLocation.set(location);
+        }
+
+        @Override
+        public void onStatusChanged(String s, int i, Bundle bundle) { }
+
+        @Override
+        public void onProviderEnabled(String s) {
+            notificationManager.cancel(1);
+        }
+
+        @Override
+        public void onProviderDisabled(String s) {
+            notificationManager.notify(1, noGPSNotification);
+        }
+    };
+    private LocationListener locationListener;
 
     /** Details of a remote device.  These methods are thread safe. */
     public abstract static class Device {
@@ -196,7 +234,15 @@ public class BluetoothLoggerService extends Service {
                 case DeviceConnection.MESSAGE_READ:
                     ++messageCount;
                     sendToClients(MESSAGE_READ, messageCount, (String) msg.obj);
-                    capture.write(Double.NaN, Double.NaN, Double.NaN, System.currentTimeMillis(), (String) msg.obj);
+                    Location location = lastLocation.get();
+                    long now = System.currentTimeMillis();
+                    if (location == null || location.getTime() < now - 10000)
+                        capture.write(
+                                Double.NaN, Double.NaN, Double.NaN, now, (String) msg.obj);
+                    else
+                        capture.write(
+                                location.getLatitude(), location.getLongitude(), location.getAccuracy(),
+                                now, (String) msg.obj);
                     break;
             }
         }
@@ -210,7 +256,7 @@ public class BluetoothLoggerService extends Service {
         Notification notification = new Notification(R.drawable.ic_action_bluetooth,
                 "Starting logger", System.currentTimeMillis());
         notification.setLatestEventInfo(context, "Bluetooth logger running", "", null);
-        startForeground(nextNotificationId.getAndIncrement(), notification);
+        startForeground(2, notification);
         DeviceHandler handler = new DeviceHandler(address);
         handlers.put(handler.id, handler);
         handler.connect();
@@ -225,6 +271,8 @@ public class BluetoothLoggerService extends Service {
         handlersByDbId.remove(handler.descriptor.dbid);
         if (handlers.size() == 0) {
             stopForeground(true);
+            locationManager.removeUpdates(locationListener);
+            locationListener = null;
             try {
                 db.close();
             } catch (IOException e) {
@@ -236,6 +284,16 @@ public class BluetoothLoggerService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         db = new LogDatabase(this);
+
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        locationListener = new GPSListener();
+        if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER))
+            locationListener.onProviderDisabled("");
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
+                10000,          // 10-second interval.
+                10,             // 10 meters.
+                locationListener);
+
         return START_STICKY;
     }
 
