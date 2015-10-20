@@ -36,7 +36,10 @@ import java.lang.ref.WeakReference;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 import au.id.dsp.bikeairsensorlogger.R;
 import au.id.dsp.bikeairsensorlogger.bluetooth.BluetoothLoggerService;
@@ -53,8 +56,9 @@ public class CaptureListFragment extends ListFragment {
     private ListView view;
     private BluetoothLoggerService.Binder service;
 
-    /** Any views that are currently active */
-    private final LongSparseArray<WeakReference<View>> views = new LongSparseArray<>();
+    /** Any views that are currently active. This map is back to front, but
+     * searching the values shouldn't take long. */
+    private final Map<View, Long> views = new WeakHashMap<View, Long>();
 
     public CaptureListFragment() {
     }
@@ -66,25 +70,26 @@ public class CaptureListFragment extends ListFragment {
 
     private final ServiceConnection loggerServiceConnection = new ServiceConnection() {
         private final Handler loggerHandler = new Handler(Looper.getMainLooper()) {
-            /** The database ID for each capture ID */
-            private SparseArray<Long> dbIDs = new SparseArray<>();
             @Override
             public void handleMessage(Message msg) {
                 switch (msg.what) {
                     case BluetoothLoggerService.MESSAGE_UPDATE:
                         // Find the view for this ID, if it's being used
-                        WeakReference<View> ref = views.get(((BluetoothLoggerService.Device) msg.obj).getDbid());
-                        View view = ref == null ? null : ref.get();
-                        if (msg.arg2 == DeviceConnection.State.CLOSED.ordinal()) {
-                            dbIDs.remove(msg.arg1);
-                            if (view != null)
-                                ((TextView) view.findViewById(R.id.statusView)).setText("");
-                        } else {
-                            if (view != null) {
-                                String text = msg.arg2 == DeviceConnection.State.ERROR.ordinal()
-                                    ? ((BluetoothLoggerService.Device) msg.obj).getLastError().getLocalizedMessage()
-                                    : DeviceConnection.State.values()[msg.arg2].toString();
-                                ((TextView) view.findViewById(R.id.statusView)).setText(text);
+                        for (Map.Entry<View, Long> en: views.entrySet()) {
+                            View view = en.getKey();
+                            long dbid = ((BluetoothLoggerService.Device) msg.obj).getDbid();
+                            if (en.getValue() == dbid) {
+                                if (msg.arg2 == DeviceConnection.State.CLOSED.ordinal()) {
+                                    if (view != null)
+                                        ((TextView) view.findViewById(R.id.statusView)).setText("");
+                                } else {
+                                    if (view != null) {
+                                        String text = msg.arg2 == DeviceConnection.State.ERROR.ordinal()
+                                                ? ((BluetoothLoggerService.Device) msg.obj).getLastError().getLocalizedMessage()
+                                                : DeviceConnection.State.values()[msg.arg2].toString();
+                                        ((TextView) view.findViewById(R.id.statusView)).setText(text);
+                                    }
+                                }
                             }
                         }
                         break;
@@ -150,21 +155,15 @@ public class CaptureListFragment extends ListFragment {
                 0) {
             @Override
             public void bindView(View view, Context context, Cursor cursor) {
-                // Is this view being recycled?
-                if (view != null && view.getTag() != null) {
-                    views.remove((Long) view.getTag());
-                    view.setTag(null);
-                }
                 super.bindView(view, context, cursor);
                 long id = cursor.getLong(cursor.getColumnIndex(BaseColumns._ID));
                 // If this is a live capture, provide status updates
                 String status = "";
                 if (service != null) {
-                    BluetoothLoggerService.Device device = service.getDevice(cursor.getLong(cursor.getColumnIndex(BaseColumns._ID)));
+                    BluetoothLoggerService.Device device = service.getDevice(id);
                     if (device != null) {
                         status = device.getState().toString();
-                        view.setTag(id);
-                        views.put(id, new WeakReference<View>(view));
+                        views.put(view, id);
                     }
                 }
                 ((TextView) view.findViewById(R.id.statusView)).setText(status);
