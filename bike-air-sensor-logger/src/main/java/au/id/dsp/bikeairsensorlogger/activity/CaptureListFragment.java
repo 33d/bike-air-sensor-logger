@@ -157,8 +157,10 @@ public class CaptureListFragment extends ListFragment {
             @Override
             public void bindView(View view, Context context, Cursor cursor) {
                 // Is this view being recycled?
-                if (view != null && view.getTag() != null)
+                if (view != null && view.getTag() != null) {
                     views.remove((Long) view.getTag());
+                    view.setTag(null);
+                }
                 super.bindView(view, context, cursor);
                 long id = cursor.getLong(cursor.getColumnIndex(BaseColumns._ID));
                 // If this is a live capture, provide status updates
