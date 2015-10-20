@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -57,16 +58,22 @@ public class BluetoothLoggerService extends Service {
 
     private static final int MESSAGE_RETRYCONNECT = 50000;
 
-    private static final Collection<WeakReference<Handler>> clients = new ArrayList<WeakReference<Handler>>();
+    private final Map<Intent, WeakReference<Handler>> clients = new IdentityHashMap<Intent, WeakReference<Handler>>();
 
     public class Binder extends android.os.Binder {
+        private final Intent intent;
+
+        public Binder(Intent intent) {
+            this.intent = intent;
+        }
+
         public void connect(Context context, String address) {
             BluetoothLoggerService.this.connect(context, address);
         }
 
         public void register(Handler handler) {
             synchronized (BluetoothLoggerService.this) {
-                clients.add(new WeakReference<Handler>(handler));
+                clients.put(intent, new WeakReference<Handler>(handler));
                 for (int i = 0 ; i < handlers.size(); i++)
                     handlers.valueAt(i).sendState(handler);
             }
@@ -89,7 +96,6 @@ public class BluetoothLoggerService extends Service {
             return h == null ? null : h.descriptor;
         }
     };
-    private final Binder clientBinder = new Binder();
     private LogDatabase db;
     private LocationManager locationManager;
     private final AtomicReference<Location> lastLocation = new AtomicReference<>();
@@ -199,7 +205,7 @@ public class BluetoothLoggerService extends Service {
 
         private void sendToClients(int what, int arg2, Object o) {
             synchronized (BluetoothLoggerService.this) {
-                for (Iterator<WeakReference<Handler>> it = clients.iterator(); it.hasNext(); ) {
+                for (Iterator<WeakReference<Handler>> it = clients.values().iterator(); it.hasNext(); ) {
                     Handler h = it.next().get();
                     if (h == null)
                         it.remove();
@@ -299,7 +305,7 @@ public class BluetoothLoggerService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        return clientBinder;
+        return new Binder(intent);
     }
 
     @Override
