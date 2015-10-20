@@ -106,6 +106,8 @@ public class CaptureProvider extends ContentProvider {
                         BaseColumns._ID + "=?",
                         new String[] { uri.getLastPathSegment() });
                 getContext().getContentResolver().notifyChange(uri, null);
+                getContext().getContentResolver().notifyChange(CAPTURES_URI, null);
+                getContext().getContentResolver().notifyChange(CAPTURES_WITH_COUNTS_URI, null);
         }
         return 0;
     }

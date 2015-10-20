@@ -5,6 +5,7 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.net.Uri;
 import android.provider.BaseColumns;
 
 import java.io.Closeable;
@@ -17,6 +18,8 @@ import java.util.Iterator;
  * Created by damien on 10/10/15.
  */
 public class LogDatabase implements Closeable {
+
+    private final Context context;
 
     private class DBHelper extends SQLiteOpenHelper {
         public static final int DATABASE_VERSION = 1;
@@ -166,13 +169,16 @@ public class LogDatabase implements Closeable {
             values.put("ACCURACY", accuracy);
             values.put("TIME", time);
             values.put("TEXT", text);
-            db.insertOrThrow("LOG", null, values);
+            long id = db.insertOrThrow("LOG", null, values);
+            context.getContentResolver().notifyChange(
+                    Uri.withAppendedPath(CaptureProvider.CAPTURES_WITH_COUNTS_URI, Long.toString(key)), null);
         }
     }
 
     final SQLiteDatabase db;
 
     public LogDatabase(Context context) {
+        this.context = context;
         db = new DBHelper(context).getWritableDatabase();
     }
 
@@ -183,6 +189,10 @@ public class LogDatabase implements Closeable {
         values.put("NAME", name);
         values.put("START", start);
         long id = db.insertOrThrow("CAPTURE", null, values);
+        context.getContentResolver().notifyChange(
+                Uri.withAppendedPath(CaptureProvider.CAPTURES_URI, Long.toString(id)), null);
+        context.getContentResolver().notifyChange(
+                Uri.withAppendedPath(CaptureProvider.CAPTURES_WITH_COUNTS_URI, Long.toString(id)), null);
         return new WritableCapture(id, address, name, new Date(start), null);
     }
 

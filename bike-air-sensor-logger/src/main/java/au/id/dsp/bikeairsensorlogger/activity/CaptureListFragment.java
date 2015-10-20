@@ -94,12 +94,6 @@ public class CaptureListFragment extends ListFragment {
                             }
                         }
                         break;
-                    case BluetoothLoggerService.MESSAGE_READ:
-                        WeakReference<View> ref = views.get(dbIDs.get(msg.arg1));
-                        View view = ref == null ? null : ref.get();
-                        if (view != null)
-                            ((TextView) view.findViewById(R.id.countView)).setText(Integer.toString(msg.arg2));
-                        break;
                 }
             }
         };
