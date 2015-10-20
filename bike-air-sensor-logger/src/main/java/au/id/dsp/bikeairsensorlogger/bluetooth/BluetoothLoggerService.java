@@ -96,7 +96,7 @@ public class BluetoothLoggerService extends Service {
     private class GPSListener implements LocationListener {
         private final Notification noGPSNotification = new NotificationCompat.Builder(BluetoothLoggerService.this)
                 .setContentTitle("GPS is turned off")
-                .setSmallIcon(R.drawable.ic_status_warning)
+                .setSmallIcon(R.drawable.ic_gps_not_fixed_white_24dp)
                 .setPriority(Notification.PRIORITY_HIGH)
                 .build();
         NotificationManager notificationManager =
