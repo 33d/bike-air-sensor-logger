@@ -72,25 +72,19 @@ public class CaptureListFragment extends ListFragment {
             public void handleMessage(Message msg) {
                 switch (msg.what) {
                     case BluetoothLoggerService.MESSAGE_UPDATE:
-                        if (msg.arg2 == DeviceConnection.State.IDLE.ordinal()) {
-                            // Ooh, it's new!
-                            getLoaderManager().restartLoader(0, null, loaderCallbacks);
-                            dbIDs.put(msg.arg1, ((BluetoothLoggerService.Device) msg.obj).getDbid());
+                        // Find the view for this ID, if it's being used
+                        WeakReference<View> ref = views.get(((BluetoothLoggerService.Device) msg.obj).getDbid());
+                        View view = ref == null ? null : ref.get();
+                        if (msg.arg2 == DeviceConnection.State.CLOSED.ordinal()) {
+                            dbIDs.remove(msg.arg1);
+                            if (view != null)
+                                ((TextView) view.findViewById(R.id.statusView)).setText("");
                         } else {
-                            // Find the view for this ID, if it's being used
-                            WeakReference<View> ref = views.get(((BluetoothLoggerService.Device) msg.obj).getDbid());
-                            View view = ref == null ? null : ref.get();
-                            if (msg.arg2 == DeviceConnection.State.CLOSED.ordinal()) {
-                                dbIDs.remove(msg.arg1);
-                                if (view != null)
-                                    ((TextView) view.findViewById(R.id.statusView)).setText("");
-                            } else {
-                                if (view != null) {
-                                    String text = msg.arg2 == DeviceConnection.State.ERROR.ordinal()
-                                        ? ((BluetoothLoggerService.Device) msg.obj).getLastError().getLocalizedMessage()
-                                        : DeviceConnection.State.values()[msg.arg2].toString();
-                                    ((TextView) view.findViewById(R.id.statusView)).setText(text);
-                                }
+                            if (view != null) {
+                                String text = msg.arg2 == DeviceConnection.State.ERROR.ordinal()
+                                    ? ((BluetoothLoggerService.Device) msg.obj).getLastError().getLocalizedMessage()
+                                    : DeviceConnection.State.values()[msg.arg2].toString();
+                                ((TextView) view.findViewById(R.id.statusView)).setText(text);
                             }
                         }
                         break;
